@@ -6,11 +6,17 @@ import crypto from "crypto";
 import path from "path";
 import { promises as fs } from "fs";
 
-export const getTargetFilenamesAndChunkHashes = async (
-    manifest: Manifest,
-    outputFolder: string,
-    patterns?: string[]
-) => {
+export const getTargetFilenamesAndChunkHashes = async ({
+    manifest,
+    outputFolder,
+    patterns,
+    force,
+}: {
+    manifest: Manifest;
+    outputFolder: string;
+    patterns?: string[];
+    force?: boolean;
+}) => {
     const filesToDownload: string[][] = [];
     const chunksToDownload: string[] = [];
 
@@ -31,7 +37,8 @@ export const getTargetFilenamesAndChunkHashes = async (
                 if (!match) continue;
             }
 
-            if (await checkIfFileIsUpToDate(file, outputFolder)) continue;
+            if (!force && (await checkIfFileIsUpToDate(file, outputFolder)))
+                continue;
 
             if (file.chunksLength() === 0) {
                 chunksToDownload.push(fileHash);

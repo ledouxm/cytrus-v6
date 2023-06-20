@@ -77,11 +77,12 @@ yargs(hideBin(process.argv))
             const manifest = Manifest.getRootAsManifest(bb);
 
             const { filesToDownload, chunksToDownload } =
-                await getTargetFilenamesAndChunkHashes(
+                await getTargetFilenamesAndChunkHashes({
                     manifest,
                     outputFolder,
-                    patterns
-                );
+                    patterns,
+                    force,
+                });
 
             await downloadFragments(
                 manifest,
