@@ -18,9 +18,13 @@ export const getManifestBinaryFile = async (
     return resp.data;
 };
 
-export const getBundleChunks = async (bundleHash: string, range: string) => {
+export const getBundleChunks = async (
+    game: string,
+    bundleHash: string,
+    range: string
+) => {
     const response = await axios.get(
-        `https://cytrus.cdn.ankama.com/dofus/bundles/${bundleHash.slice(
+        `https://cytrus.cdn.ankama.com/${game}/bundles/${bundleHash.slice(
             0,
             2
         )}/${bundleHash}`,

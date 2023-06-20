@@ -85,6 +85,7 @@ yargs(hideBin(process.argv))
                 });
 
             await downloadFragments(
+                game,
                 manifest,
                 filesToDownload,
                 chunksToDownload,
@@ -112,6 +113,7 @@ yargs(hideBin(process.argv))
     .help().argv;
 
 const downloadFragments = async (
+    game: string,
     manifest: Manifest,
     filesToDownload: string[][],
     chunksToDownload: string[],
@@ -148,6 +150,7 @@ const downloadFragments = async (
 
             // download chunks
             const data = await getBundleChunks(
+                game,
                 bundleHash,
                 chunkRange.map((c) => c.range).join(", ")
             );
