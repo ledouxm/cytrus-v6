@@ -1,16 +1,20 @@
 import axios from "axios";
 
-export const getLatestVersion = async (game: GameNames) => {
+export const getLatestVersion = async (
+    game: GameNames,
+    platform: Platforms
+) => {
     const resp = await axios.get("https://cytrus.cdn.ankama.com/cytrus.json");
-    return resp.data.games[game].platforms.windows.main;
+    return resp.data.games[game].platforms[platform].main;
 };
 
 export const getManifestBinaryFile = async (
     game: GameNames,
+    platform: Platforms,
     version: string
 ) => {
     const resp = await axios.get(
-        `https://cytrus.cdn.ankama.com/${game}/releases/main/windows/${version}.manifest`,
+        `https://cytrus.cdn.ankama.com/${game}/releases/main/${platform}/${version}.manifest`,
         {
             responseType: "arraybuffer",
         }
@@ -49,3 +53,6 @@ export const gameNames = [
     "wakfu",
 ] as const;
 export type GameNames = (typeof gameNames)[number];
+
+export const platforms = ["windows", "darwin", "linux"] as const;
+export type Platforms = (typeof platforms)[number];

@@ -4,6 +4,7 @@ import yargs from "yargs/yargs";
 import { hideBin } from "yargs/helpers";
 import {
     GameNames,
+    Platforms,
     getBundleChunks,
     getLatestVersion,
     getManifestBinaryFile,
@@ -42,6 +43,13 @@ yargs(hideBin(process.argv))
                     type: "string",
                     description: "Game to download (dofus, retro, ...)",
                 })
+                .option("platform", {
+                    default: "windows",
+                    type: "string",
+                    alias: "p",
+                    description:
+                        "Platform to download (windows, darwin, linux)",
+                })
                 .option("force", {
                     default: false,
                     alias: "f",
@@ -57,7 +65,7 @@ yargs(hideBin(process.argv))
                 });
         },
         async (argv) => {
-            const { game, select, force, output } =
+            const { game, select, force, output, platform } =
                 argv as any as CommandTypes["download"];
 
             const patterns = select?.split(",").map((x) => x.trim());
@@ -70,8 +78,12 @@ yargs(hideBin(process.argv))
             await createFoldersRecursively(chunkOutputFolder);
             await createFoldersRecursively(outputFolder);
 
-            const version = await getLatestVersion(game);
-            const manifestBin = await getManifestBinaryFile(game, version);
+            const version = await getLatestVersion(game, platform);
+            const manifestBin = await getManifestBinaryFile(
+                game,
+                platform,
+                version
+            );
             const bb = new ByteBuffer(manifestBin);
 
             const manifest = Manifest.getRootAsManifest(bb);
@@ -98,15 +110,27 @@ yargs(hideBin(process.argv))
         "version",
         "Show latest game version",
         (yargs) => {
-            yargs.usage("Usage: $0 version [--game=]").option("game", {
-                default: "dofus",
-                alias: "g",
-                type: "string",
-                description: "Game to download (dofus, retro, ...)",
-            });
+            yargs
+                .usage("Usage: $0 version [--game=]")
+                .option("game", {
+                    default: "dofus",
+                    alias: "g",
+                    type: "string",
+                    description: "Game to download (dofus, retro, ...)",
+                })
+                .option("platform", {
+                    default: "windows",
+                    type: "string",
+                    alias: "p",
+                    description:
+                        "Platform to download (windows, darwin, linux)",
+                });
         },
         async (argv) => {
-            const version = await getLatestVersion(argv.game as GameNames);
+            const version = await getLatestVersion(
+                argv.game as GameNames,
+                argv.platform as Platforms
+            );
             console.log(version);
         }
     )
@@ -225,6 +249,7 @@ interface CommandTypes {
         select?: string;
         force?: boolean;
         game: GameNames;
+        platform: Platforms;
         output: string;
     };
     version: {
