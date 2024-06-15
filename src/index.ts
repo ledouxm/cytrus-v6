@@ -50,6 +50,13 @@ yargs(hideBin(process.argv))
                     description:
                         "Platform to download (windows, darwin, linux)",
                 })
+                .option("beta", {
+                    default: "windows",
+                    type: "boolean",
+                    alias: "b",
+                    description:
+                        "Download beta version",
+                })
                 .option("force", {
                     default: false,
                     alias: "f",
