@@ -50,6 +50,13 @@ yargs(hideBin(process.argv))
                     description:
                         "Platform to download (windows, darwin, linux)",
                 })
+                .option("beta", {
+                    default: false,
+                    type: "boolean",
+                    alias: "b",
+                    description:
+                        "Download beta version",
+                })
                 .option("force", {
                     default: false,
                     alias: "f",
@@ -65,7 +72,7 @@ yargs(hideBin(process.argv))
                 });
         },
         async (argv) => {
-            const { game, select, force, output, platform } =
+            const { game, select, force, output, platform, beta } =
                 argv as any as CommandTypes["download"];
 
             const patterns = select?.split(",").map((x) => x.trim());
@@ -78,11 +85,12 @@ yargs(hideBin(process.argv))
             await createFoldersRecursively(chunkOutputFolder);
             await createFoldersRecursively(outputFolder);
 
-            const version = await getLatestVersion(game, platform);
+            const version = await getLatestVersion(game, platform, beta);
             const manifestBin = await getManifestBinaryFile(
                 game,
                 platform,
-                version
+                version,
+                beta
             );
             const bb = new ByteBuffer(manifestBin);
 
@@ -251,6 +259,7 @@ interface CommandTypes {
         game: GameNames;
         platform: Platforms;
         output: string;
+        beta: boolean;
     };
     version: {
         game: string;
