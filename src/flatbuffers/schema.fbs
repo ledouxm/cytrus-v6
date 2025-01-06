@@ -28,4 +28,3 @@ table Chunk {
     offset: int64;
 }
 
-

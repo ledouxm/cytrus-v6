@@ -91,10 +91,15 @@ const checkAfterFileIsOpen = async (file: File, f: fs.FileHandle) => {
 
         const buffer = Buffer.alloc(Number(chunk.size()));
 
-        await f.read(buffer, 0, Number(chunk.size()), Number(chunk.offset()));
+        await f.read(
+            buffer as any,
+            0,
+            Number(chunk.size()),
+            Number(chunk.offset())
+        );
         const existingFileHash = crypto
             .createHash("sha1")
-            .update(buffer)
+            .update(buffer as any)
             .digest("hex");
 
         if (existingFileHash !== hash) return false;

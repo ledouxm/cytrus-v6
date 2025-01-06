@@ -1,65 +1,108 @@
-export const parseCloudflareResponse = (e: Buffer, delimiter = "") => {
-    delimiter = "--" + delimiter;
-    const n: ParsedChunk[] = [];
-    let i = 0;
-    for (;;) {
-        const o = e.indexOf(delimiter, i);
-        if (-1 === o) break;
-        if (
-            ((i = e.indexOf("\n", o)),
-            -1 === i && (i = e.length - 1),
-            e.slice(o, i).toString().trim() === delimiter + "--")
-        )
-            break;
-        i += 1;
-        const s = {
-            headers: null as any,
-            data: null as any,
-            range: undefined as any,
-        };
-        let a = 0;
-        for (; !a; ) {
-            const t = e.indexOf("\n", i);
-            -1 === t && (a = e.length - 1);
-            const n = e.slice(i, t).toString().trim();
-            if (((i = t + 1), n)) {
-                s.headers || (s.headers = {});
-                const e = n.split(":");
-                s.headers[e[0]] = e[1] ? e[1].trim() : e[1];
-            } else a = 1;
+interface ChunkResponse {
+    contentRange: {
+        start: number;
+        end: number;
+        total: number;
+    };
+    data: Buffer;
+}
+
+export function parseResponse(buffer: Buffer): ChunkResponse[] {
+    // Convert first few bytes to string to check for multipart boundary
+    const previewContent = buffer
+        .slice(0, Math.min(buffer.length, 1000))
+        .toString();
+
+    // Check if this is a multipart response by looking for the boundary
+    if (previewContent.startsWith("--")) {
+        return parseMultipartResponse(buffer);
+    } else {
+        // Handle single response
+        // Look for Content-Range in the headers
+        const headerEnd = previewContent.indexOf("\r\n\r\n");
+        if (headerEnd === -1) {
+            // No headers found, assume this is just raw data
+            return [
+                {
+                    contentRange: {
+                        start: 0,
+                        end: buffer.length - 1,
+                        total: buffer.length,
+                    },
+                    data: buffer,
+                },
+            ];
         }
-        if (!s.headers) break;
-        if (
-            ((s.range = parseContentRange(s.headers["Content-Range"])),
-            "bytes" !== s.range.unit)
-        )
-            throw new Error("Unsupported range type : " + s.range.unit);
-        (s.range.size = s.range.end - s.range.start + 1),
-            (s.data = e.slice(i, i + s.range.size)),
-            (i += s.range.size),
-            n.push(s);
+
+        const headers = previewContent.slice(0, headerEnd);
+        const rangeMatch = headers.match(
+            /Content-Range: bytes (\d+)-(\d+)\/(\d+)/
+        );
+
+        if (!rangeMatch) {
+            // No Content-Range header, assume this is just raw data
+            return [
+                {
+                    contentRange: {
+                        start: 0,
+                        end: buffer.length - 1,
+                        total: buffer.length,
+                    },
+                    data: buffer,
+                },
+            ];
+        }
+
+        const [, start, end, total] = rangeMatch;
+        // Get the body after headers
+        const body = buffer.slice(headerEnd + 4); // +4 for \r\n\r\n
+
+        return [
+            {
+                contentRange: {
+                    start: parseInt(start),
+                    end: parseInt(end),
+                    total: parseInt(total),
+                },
+                data: body,
+            },
+        ];
     }
-    return n;
-};
+}
 
-export type ParsedChunk = {
-    headers: { "Content-Type"?: string; "Content-Range"?: string };
-    data: Uint8Array;
-    range: { unit: string; start: number; end: number; size: number };
-};
+function parseMultipartResponse(buffer: Buffer): ChunkResponse[] {
+    // Convert buffer to string for easier processing
+    const content = buffer.toString();
 
-function parseContentRange(e: string) {
-    var t = e.match(/^(\w+) ((\d+)-(\d+)|\*)\/(\d+|\*)$/);
-    if (!t) return null;
-    var n = t[1],
-        r = t[3],
-        i = t[4],
-        o = t[5],
-        s = {
-            unit: n,
-            start: null != r ? Number(r) : null,
-            end: null != i ? Number(i) : null,
-            size: "*" === o ? null : Number(o),
+    // Split the content by boundary
+    const boundary = content.split("\n")[0].trim();
+    const parts = content.split(boundary).slice(1, -1); // Remove first empty part and last boundary
+
+    return parts.map((part) => {
+        // Split headers and body
+        const [headers, ...bodyParts] = part.split("\r\n\r\n");
+        const body = bodyParts.join("\r\n\r\n");
+
+        // Parse Content-Range header
+        const rangeMatch = headers.match(
+            /Content-Range: bytes (\d+)-(\d+)\/(\d+)/
+        );
+        if (!rangeMatch) {
+            throw new Error("Invalid Content-Range header");
+        }
+
+        const [, start, end, total] = rangeMatch;
+
+        // Convert body back to Buffer, removing trailing \r\n
+        const bodyBuffer = Buffer.from(body.trim(), "binary");
+
+        return {
+            contentRange: {
+                start: parseInt(start),
+                end: parseInt(end),
+                total: parseInt(total),
+            },
+            data: bodyBuffer,
         };
-    return null === s.start && null === s.end && null === s.size ? null : s;
+    });
 }

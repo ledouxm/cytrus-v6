@@ -14,14 +14,15 @@ import { ByteBuffer } from "flatbuffers";
 import os from "os";
 import path from "path";
 import { promises as fs } from "fs";
-import { Chunk } from "./flatbuffers/chunk";
 import {
     createFoldersRecursively,
     getStringFromHashArray,
     safeRmDir,
 } from "./utils";
 import { getTargetFilenamesAndChunkHashes } from "./targets";
-import { parseCloudflareResponse } from "./cloudflare";
+import { chunk } from "pastable";
+import { parseResponse } from "./cloudflare";
+import { ManifestDownloader } from "./v2";
 
 yargs(hideBin(process.argv))
     .scriptName("cytrus-v6")
@@ -50,6 +51,11 @@ yargs(hideBin(process.argv))
                     description:
                         "Platform to download (windows, darwin, linux)",
                 })
+                .option("release", {
+                    default: "main",
+                    type: "string",
+                    description: "Release to download (main, beta, dofus3...)",
+                })
                 .option("force", {
                     default: false,
                     alias: "f",
@@ -65,10 +71,10 @@ yargs(hideBin(process.argv))
                 });
         },
         async (argv) => {
-            const { game, select, force, output, platform } =
+            const { game, select, force, output, platform, release } =
                 argv as any as CommandTypes["download"];
 
-            const patterns = select?.split(",").map((x) => x.trim());
+            const patterns = select?.split(",").map((x) => x.trim()) ?? ["*"];
 
             const chunkOutputFolder = path.join(os.tmpdir(), "cytrus-v6", game);
             const outputFolder = path.resolve(output);
@@ -78,32 +84,79 @@ yargs(hideBin(process.argv))
             await createFoldersRecursively(chunkOutputFolder);
             await createFoldersRecursively(outputFolder);
 
-            const version = await getLatestVersion(game, platform);
+            const version = await getLatestVersion(game, platform, release);
             const manifestBin = await getManifestBinaryFile(
                 game,
                 platform,
+                release,
                 version
             );
             const bb = new ByteBuffer(manifestBin);
 
             const manifest = Manifest.getRootAsManifest(bb);
+            const downloader = new ManifestDownloader();
 
-            const { filesToDownload, chunksToDownload } =
-                await getTargetFilenamesAndChunkHashes({
-                    manifest,
-                    outputFolder,
-                    patterns,
-                    force,
-                });
+            await downloader.downloadSelectedFiles(manifest, {
+                patterns,
+                chunkSize: 20,
+                concurrency: 10,
+                outputFolder,
+            });
 
-            await downloadFragments(
-                game,
-                manifest,
-                filesToDownload,
-                chunksToDownload,
-                chunkOutputFolder,
-                outputFolder
+            // const { filesToDownload, chunksToDownload } =
+            //     await getTargetFilenamesAndChunkHashes({
+            //         manifest,
+            //         outputFolder,
+            //         patterns,
+            //         force,
+            //     });
+
+            // await downloadFragments(
+            //     game,
+            //     manifest,
+            //     filesToDownload,
+            //     chunksToDownload,
+            //     chunkOutputFolder,
+            //     outputFolder
+            // );
+
+            console.log("done");
+        }
+    )
+    .command(
+        "test",
+        "test",
+        (yargs) => {},
+        async () => {
+            const result = await getBundleChunks(
+                "dofus",
+                "2ed6127d872f83f0bede4fd17fa9f229daaa34ca",
+                "3142830-3211671, 3211672-3236349, 3236350-3256893, 3256894-3303385, 3303386-3370056, 3370057-3400079, 3400080-3466053, 3466054-3534345, 3534346-3553876, 3553877-3620546"
             );
+
+            const str = result.toString("utf8");
+            const parts: Buffer[] = [];
+
+            // Split on boundary and process each part
+            const boundaries = str
+                .split("\n")
+                .filter((line) => line.startsWith("--"));
+            const boundary = boundaries[0];
+
+            const sections = str.split(boundary).filter(Boolean);
+
+            for (const section of sections) {
+                if (section.includes("Content-Type")) {
+                    // Find the actual content after headers
+                    const contentStart = section.indexOf("\r\n\r\n") + 4;
+                    if (contentStart > 4) {
+                        const content = section.substring(contentStart);
+                        parts.push(Buffer.from(content.trim()));
+                    }
+                }
+            }
+
+            console.log(parts.map((part) => part.toString("utf8", 0, 20)));
         }
     )
     .command(
@@ -124,12 +177,18 @@ yargs(hideBin(process.argv))
                     alias: "p",
                     description:
                         "Platform to download (windows, darwin, linux)",
+                })
+                .option("release", {
+                    default: "main",
+                    type: "string",
+                    description: "Release to download (main, beta, dofus3...)",
                 });
         },
         async (argv) => {
             const version = await getLatestVersion(
                 argv.game as GameNames,
-                argv.platform as Platforms
+                argv.platform as Platforms,
+                argv.release as string
             );
             console.log(version);
         }
@@ -144,112 +203,136 @@ const downloadFragments = async (
     chunkOutputFolder: string,
     outputFolder: string
 ) => {
+    const downloadedChunks = new Set<string>();
+
+    const tmpOutputFolder = path.join(os.tmpdir(), "cytrus-v6", game);
+    await createFoldersRecursively(tmpOutputFolder);
+
     for (let i = 0; i < manifest.fragmentsLength(); i++) {
         const fragmentFiles = filesToDownload[i];
-        console.log(`Parsing fragment ${i}/${manifest.fragmentsLength()}`);
+        console.log(
+            `Processing fragment ${i + 1}/${manifest.fragmentsLength()}`
+        );
         const fragment = manifest.fragments(i)!;
+
         for (let j = 0; j < fragment.bundlesLength(); j++) {
             const bundle = fragment.bundles(j)!;
-            const bundleChunks: Chunk[] = [];
+            const bundleHash = getStringFromHashArray(bundle.hashArray()!);
+            const bundleChunks = [];
 
-            // process bundle so we know which to download
             for (let k = 0; k < bundle.chunksLength(); k++) {
                 const chunk = bundle.chunks(k)!;
                 const hash = getStringFromHashArray(chunk.hashArray()!);
 
                 if (!chunksToDownload.includes(hash)) continue;
 
-                bundleChunks.push(chunk);
+                bundleChunks.push({
+                    hash,
+                    start: Number(chunk.offset()),
+                    size: Number(chunk.size()),
+                    range: `${chunk.offset()}-${
+                        Number(chunk.offset()) + Number(chunk.size()) - 1
+                    }`,
+                });
             }
 
             if (bundleChunks.length === 0) continue;
 
-            const chunkRange = bundleChunks.map((chunk) => ({
-                hash: getStringFromHashArray(chunk.hashArray()!),
-                range: `${chunk.offset()}-${
-                    Number(chunk.offset()) + Number(chunk.size()) - 1
-                }`,
-            }));
-            const bundleHash = getStringFromHashArray(bundle.hashArray()!);
+            const chunkedGroups = chunk(bundleChunks, 10);
+            for (const group of chunkedGroups) {
+                const rangeString = group.map((c) => c.range).join(", ");
 
-            // download chunks
-            const data = await getBundleChunks(
-                game,
-                bundleHash,
-                chunkRange.map((c) => c.range).join(", ")
-            );
-
-            if (chunkRange.length === 1) {
-                await fs.writeFile(
-                    path.join(chunkOutputFolder, chunkRange[0].hash),
-                    data
+                const rawData = await getBundleChunks(
+                    game,
+                    bundleHash,
+                    rangeString
                 );
-                continue;
-            }
+                const parsedChunks = parseResponse(rawData);
 
-            // process response
-            const parsedChunks = parseCloudflareResponse(data, "");
+                for (const parsedChunk of parsedChunks) {
+                    const matchingChunk = group.find(
+                        (c) =>
+                            c.start === parsedChunk.contentRange.start &&
+                            c.start + c.size - 1 ===
+                                parsedChunk.contentRange.end
+                    );
 
-            // write chunks to disk
-            for (const parsedChunk of parsedChunks) {
-                const hash = chunkRange.find(
-                    (c) =>
-                        c.range ===
-                        `${parsedChunk.range.start}-${parsedChunk.range.end}`
-                )!.hash;
-                const chunk = parsedChunk.data;
-                await fs.writeFile(path.join(chunkOutputFolder, hash), chunk);
+                    if (!matchingChunk) {
+                        throw new Error(
+                            `Could not find matching chunk for range ${parsedChunk.contentRange.start}-${parsedChunk.contentRange.end}`
+                        );
+                    }
+
+                    await fs.writeFile(
+                        path.join(chunkOutputFolder, matchingChunk.hash),
+                        parsedChunk.data as any
+                    );
+
+                    downloadedChunks.add(matchingChunk.hash);
+                }
             }
         }
 
         for (let j = 0; j < fragment.filesLength(); j++) {
             const file = fragment.files(j)!;
-            const name = file.name()!;
             const fileHash = getStringFromHashArray(file.hashArray()!);
 
             if (!fragmentFiles.includes(fileHash)) continue;
 
-            const chunkData = [];
+            const name = file.name()!;
+            const chunkData: Buffer[] = [];
 
             if (file.chunksLength() === 0) {
-                const fileHash = getStringFromHashArray(file.hashArray()!);
+                if (!downloadedChunks.has(fileHash)) continue;
 
                 const fileContent = await fs.readFile(
                     path.join(chunkOutputFolder, fileHash)
                 );
-
                 chunkData.push(fileContent);
+            } else {
+                let hasAllChunks = true;
+                const fileChunks: string[] = [];
+
+                for (let k = 0; k < file.chunksLength(); k++) {
+                    const chunk = file.chunks(k)!;
+                    const hash = getStringFromHashArray(chunk.hashArray()!);
+                    fileChunks.push(hash);
+
+                    if (!downloadedChunks.has(hash)) {
+                        hasAllChunks = false;
+                        break;
+                    }
+                }
+
+                if (!hasAllChunks) continue;
+
+                for (const hash of fileChunks) {
+                    const fileContent = await fs.readFile(
+                        path.join(chunkOutputFolder, hash)
+                    );
+                    chunkData.push(fileContent);
+                }
             }
 
-            for (let k = 0; k < file.chunksLength(); k++) {
-                const chunk = file.chunks(k)!;
-                const hash = getStringFromHashArray(chunk.hashArray()!);
-
-                const fileContent = await fs.readFile(
-                    path.join(chunkOutputFolder, hash)
-                );
-
-                chunkData.push(fileContent);
-            }
-
-            const fileContent = Buffer.concat(chunkData);
+            const fileContent = Buffer.concat(chunkData as any);
             const filePath = path.join(outputFolder, name);
 
             await createFoldersRecursively(path.dirname(filePath));
-            await fs.writeFile(filePath, fileContent);
+            await fs.writeFile(filePath, fileContent as any);
 
             console.log(`Downloaded ${name}`);
         }
     }
+
     await safeRmDir(chunkOutputFolder);
 };
-
 interface CommandTypes {
     download: {
         select?: string;
         force?: boolean;
         game: GameNames;
         platform: Platforms;
+        release: string;
         output: string;
     };
     version: {
