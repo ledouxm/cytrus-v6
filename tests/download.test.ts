@@ -1,30 +1,64 @@
-import { AxiosResponse } from "axios";
-import crypto from "crypto";
-import { ByteBuffer } from "flatbuffers";
-import { promises as fs } from "fs";
-import { minimatch } from "minimatch";
-import path from "path";
-import { beforeAll, describe, expect, it } from "vitest";
-import { fetchBundle, removeDelimiters } from "../src/api";
-import { Bundle, Manifest, Fragment } from "../src/flatbuffers/schema";
-import { createFoldersRecursively, getStringFromHashArray } from "../src/utils";
-const cache = {
-    manifest: null as Manifest | null,
-};
+import { describe, expect, it } from "vitest";
+import { download } from "../src/commands/download";
+import { getLatestVersion } from "../src/commands/version";
 
 describe(
     "Download",
     () => {
-        beforeAll(async () => {
-            const manifestBin = await fs.readFile("./output/manifest.bin");
-            const buffer = new ByteBuffer(manifestBin as any);
+        it("should get dofus3 version", async () => {
+            const version = await getLatestVersion({
+                game: "dofus",
+                platform: "windows",
+                release: "dofus3",
+            });
 
-            cache.manifest = Manifest.getRootAsManifest(buffer);
+            expect(version).toBeDefined();
         });
 
-        it("should filter fragments", async () => {});
+        it("should download a random file", async () => {
+            await download({
+                game: "dofus",
+                platform: "windows",
+                release: "dofus3",
+                output: "./output",
+                select: "**/Dofus.exe",
+                debug: true,
+            });
+        });
+
+        it("should download a single part file", async () => {
+            await download({
+                game: "dofus",
+                platform: "windows",
+                release: "dofus3",
+                output: "./output",
+                select: "Dofus_Data/StreamingAssets/Content/Animations/Props/catalog_1.0.hash",
+                debug: true,
+            });
+        });
+
+        it("should download a random file contained in 2 different bundles", async () => {
+            await download({
+                game: "dofus",
+                platform: "windows",
+                release: "dofus3",
+                output: "./output",
+                select: "Dofus_Data/StreamingAssets/aa/StandaloneWindows64/gameassets_assets_all_28d752d2282d8438ddc4ef4b4de81687.bundle",
+                debug: true,
+            });
+        });
+
+        it("should download the whole game", async () => {
+            await download({
+                game: "dofus",
+                platform: "windows",
+                release: "dofus3",
+                output: "./output",
+                debug: true,
+            });
+        });
     },
     {
-        timeout: 60000,
+        timeout: +Infinity,
     }
 );

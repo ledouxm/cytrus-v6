@@ -1,15 +1,6 @@
 import axios from "axios";
 import fs from "fs/promises";
 
-export const getLatestVersion = async (
-    game: GameNames,
-    platform: Platforms,
-    release: string
-) => {
-    const resp = await axios.get("https://cytrus.cdn.ankama.com/cytrus.json");
-    return resp.data.games[game].platforms[platform][release];
-};
-
 export const getManifestBinaryFile = async (
     game: GameNames,
     platform: Platforms,
