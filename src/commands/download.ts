@@ -367,7 +367,6 @@ function processBundle(bundle: Bundle, neededChunks: string[]): BundleRanges {
 
     for (let i = 0; i < bundle.chunksLength(); i++) {
         const chunk = bundle.chunks(i)!;
-        const bundleHash = getStringFromHashArray(bundle.hashArray()!);
         const hash = getStringFromHashArray(chunk.hashArray()!);
 
         if (!neededChunks.includes(hash)) {
