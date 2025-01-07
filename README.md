@@ -1,5 +1,7 @@
 # cytrus-v6
 
+### 🚀 Fully compatible with Dofus 3
+
 Download a game from Ankama Games with a single shell command
 
 # Install
