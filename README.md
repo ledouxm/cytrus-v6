@@ -15,7 +15,7 @@ cytrus-v6 version --game retro
 ```
 
 ```bash
-cytrus-v6 download --game dofus --output ./output --select DofusInvoker.swf,**/*.d2i
+cytrus-v6 download --game dofus --output ./output --select DofusInvoker.swf --select **/*.d2i
 ```
 
 ```bash
@@ -43,7 +43,7 @@ Usage: cytrus-v6 download [options]
 Options:
       --version   Show version number                                                     [boolean]
       --help      Show help                                                               [boolean]
-  -s, --select    Comma separated list of files to download                                [string]
+  -s, --select    Select files to download, can use wildcard character                      [array]
   -g, --game      Game to download (dofus, retro, ...)                  [string] [default: "dofus"]
   -p, --platform  Platform to download (windows, darwin, linux)       [string] [default: "windows"]
   -r, --release   Release to download (main, beta, dofus3)               [string] [default: "main"]

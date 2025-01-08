@@ -17,7 +17,9 @@ yargs(hideBin(process.argv))
                 .option("select", {
                     type: "string",
                     alias: "s",
-                    description: "Comma separated list of files to download",
+                    description:
+                        "Select files to download, can use wildcard character",
+                    array: true,
                 })
                 .option("game", {
                     default: "dofus",

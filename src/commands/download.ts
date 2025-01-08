@@ -25,7 +25,7 @@ import crypto from "crypto";
 import { getLatestVersion } from "./version";
 
 export type DownloadProps = {
-    select?: string;
+    select?: string[];
     game: GameNames;
     platform: Platforms;
     output: string;
@@ -34,15 +34,13 @@ export type DownloadProps = {
 };
 
 export const download = async ({
-    select,
+    select: patterns,
     game,
     platform,
     output,
     release,
     debug,
 }: DownloadProps) => {
-    const patterns = select?.split(",").map((x) => x.trim());
-
     const tmpBundleFolder = path.join(os.tmpdir(), "cytrus-v6", game);
     const outputFolder = path.resolve(output);
 
