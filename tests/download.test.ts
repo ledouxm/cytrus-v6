@@ -21,7 +21,7 @@ describe(
                 platform: "windows",
                 release: "dofus3",
                 output: "./output",
-                select: "**/Dofus.exe",
+                select: ["**/Dofus.exe"],
                 debug: true,
             });
         });
@@ -32,7 +32,9 @@ describe(
                 platform: "windows",
                 release: "dofus3",
                 output: "./output",
-                select: "Dofus_Data/StreamingAssets/Content/Animations/Props/catalog_1.0.hash",
+                select: [
+                    "Dofus_Data/StreamingAssets/Content/Animations/Props/catalog_1.0.hash",
+                ],
                 debug: true,
             });
         });
@@ -43,7 +45,9 @@ describe(
                 platform: "windows",
                 release: "dofus3",
                 output: "./output",
-                select: "Dofus_Data/StreamingAssets/aa/StandaloneWindows64/gameassets_assets_all_28d752d2282d8438ddc4ef4b4de81687.bundle",
+                select: [
+                    "Dofus_Data/StreamingAssets/aa/StandaloneWindows64/gameassets_assets_all_28d752d2282d8438ddc4ef4b4de81687.bundle",
+                ],
                 debug: true,
             });
         });
