@@ -1,6 +1,6 @@
 {
     "name": "cytrus-v6",
-    "version": "0.0.10",
+    "version": "0.1.0",
     "description": "",
     "main": "./dist/index.js",
     "bin": "./dist/index.js",
@@ -24,6 +24,7 @@
         "axios": "^1.4.0",
         "flatbuffers": "^23.5.26",
         "minimatch": "^9.0.1",
+        "nanospinner": "^1.2.2",
         "pastable": "^2.2.1",
         "yargs": "^17.7.2"
     }

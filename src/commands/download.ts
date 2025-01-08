@@ -23,6 +23,7 @@ import os from "os";
 import fs from "fs/promises";
 import crypto from "crypto";
 import { getLatestVersion } from "./version";
+import { createSpinner } from "nanospinner";
 
 export type DownloadProps = {
     select?: string[];
@@ -62,6 +63,11 @@ export const download = async ({
     for (let i = 0; i < manifest.fragmentsLength(); i++) {
         const fragment = manifest.fragments(i)!;
 
+        const spinner = createSpinner(
+            `Downloading ${fragment.name()!} (${
+                i + 1
+            }/${manifest.fragmentsLength()})`
+        ).start();
         await downloadFragment({
             fragment,
             game,
@@ -70,10 +76,13 @@ export const download = async ({
             patterns,
             debug,
         });
+
+        spinner.success();
     }
 
-    console.log("Cleaning up");
+    const spinner = createSpinner("Cleaning up temporary files").start();
     await safeRmDir(tmpBundleFolder);
+    spinner.success();
 
     return version;
 };
@@ -118,7 +127,6 @@ const downloadFragment = async ({
     const MAX_BUNDLE_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
     const bundleCache = new Map<string, Buffer>();
 
-    // Helper to get bundle data
     async function getBundleData(bundleHash: string) {
         if (bundleCache.has(bundleHash)) {
             return bundleCache.get(bundleHash)!;
@@ -135,8 +143,6 @@ const downloadFragment = async ({
 
         return await fs.readFile(bundlePath);
     }
-
-    console.log("Downloading", fragment.name(), "fragment");
 
     for (const [bundle, bundleRanges] of neededChunksMap.entries()) {
         const bundleHash = getStringFromHashArray(bundle.hashArray()!);
@@ -192,20 +198,24 @@ const downloadFragment = async ({
         }
     };
 
+    const filteredFiles = [];
     for (let i = 0; i < fragment.filesLength(); i++) {
-        let ctx = {} as any;
-
         const file = fragment.files(i)!;
         if (Number(file.size()) === 0) continue;
 
         const name = file.name()!;
-
         if (patterns) {
             const match = patterns?.some((pattern) => minimatch(name, pattern));
             if (!match) continue;
         }
 
-        console.log("  file", name);
+        filteredFiles.push(file);
+    }
+
+    for (const file of filteredFiles) {
+        let ctx = {} as any;
+
+        const name = file.name()!;
 
         const fullPath = path.join(outputFolder, name);
         const folder = path.dirname(fullPath);
