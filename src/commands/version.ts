@@ -7,7 +7,7 @@ export const getLatestVersion = async ({
     release,
 }: GetLatestVersionProps) => {
     const resp = await axios.get("https://cytrus.cdn.ankama.com/cytrus.json");
-    return resp.data.games[game].platforms[platform][release];
+    return resp.data.games[game].platforms[platform][release] as string;
 };
 
 export type GetLatestVersionProps = {
