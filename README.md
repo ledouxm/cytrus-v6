@@ -22,6 +22,10 @@ cytrus-v6 download --game dofus --output ./output --select DofusInvoker.swf --se
 cytrus-v6 download --game dofus --release dofus3 --output ./output --platform=linux --select **/StreamingAssets/Content/Data/**/*.bundle
 ```
 
+```bash
+cytrus-v6 download --game dofus --release dofus3 --version 6.0_3.1.10.11
+```
+
 # API Reference
 
 ```bash
@@ -29,7 +33,6 @@ cytrus-v6 download --game dofus --release dofus3 --output ./output --platform=li
 Usage: cytrus-v6 version [--game=]
 
 Options:
-      --version   Show version number                                                     [boolean]
       --help      Show help                                                               [boolean]
   -g, --game      Game to download (dofus, retro, ...)                  [string] [default: "dofus"]
   -p, --platform  Platform to download (windows, darwin, linux)       [string] [default: "windows"]
@@ -41,11 +44,11 @@ Options:
 Usage: cytrus-v6 download [options]
 
 Options:
-      --version   Show version number                                                     [boolean]
       --help      Show help                                                               [boolean]
   -s, --select    Select files to download, can use wildcard character                      [array]
   -g, --game      Game to download (dofus, retro, ...)                  [string] [default: "dofus"]
   -p, --platform  Platform to download (windows, darwin, linux)       [string] [default: "windows"]
   -r, --release   Release to download (main, beta, dofus3)               [string] [default: "main"]
   -o, --output    Output folder                                      [string] [default: "./output"]
+  -v, --version   Specific version to download                                             [string]
 ```

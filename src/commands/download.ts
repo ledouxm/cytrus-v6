@@ -31,6 +31,7 @@ export type DownloadProps = {
     platform: Platforms;
     output: string;
     release: string;
+    version?: string;
     debug?: boolean;
 };
 
@@ -41,6 +42,7 @@ export const download = async ({
     output,
     release,
     debug,
+    version: suppliedVersion,
 }: DownloadProps) => {
     const tmpBundleFolder = path.join(os.tmpdir(), "cytrus-v6", game);
     const outputFolder = path.resolve(output);
@@ -50,7 +52,12 @@ export const download = async ({
     await createFoldersRecursively(tmpBundleFolder);
     await createFoldersRecursively(outputFolder);
 
-    const version = await getLatestVersion({ game, platform, release });
+    const version =
+        suppliedVersion ??
+        (await getLatestVersion({ game, platform, release }));
+
+    console.log("Using version", version);
+
     const manifestBin = await getManifestBinaryFile(
         game,
         platform,
@@ -175,7 +182,7 @@ const downloadFragment = async ({
             }
         } finally {
             await new Promise((resolve, reject) => {
-                writeStream.on("finish", resolve);
+                writeStream.on("finish", () => resolve(null));
                 writeStream.on("error", reject);
                 writeStream.end();
 
@@ -256,7 +263,7 @@ const downloadFragment = async ({
             }
         } finally {
             await new Promise((resolve, reject) => {
-                writeStream.on("finish", resolve);
+                writeStream.on("finish", () => resolve(null));
                 writeStream.on("error", reject);
                 writeStream.end();
 

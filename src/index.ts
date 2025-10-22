@@ -46,6 +46,12 @@ yargs(hideBin(process.argv))
                     type: "string",
                     description: "Output folder",
                 })
+                .option("version", {
+                    type: "string",
+                    description:
+                        "Specific version to download (ex: 6.0_3.1.10.11)",
+                    alias: "v",
+                })
                 .option("debug", {
                     hidden: true,
                     type: "boolean",
@@ -99,6 +105,7 @@ yargs(hideBin(process.argv))
             console.log(version);
         }
     )
+    .version(false)
     .help().argv;
 
 interface CommandTypes {
